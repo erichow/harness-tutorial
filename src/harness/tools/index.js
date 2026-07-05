@@ -5,4 +5,5 @@
 export { Tool } from './base.js';
 export { tool } from './decorator.js';
 export { ToolRegistry } from './registry.js';
-export { calc, read_file, write_file, bash } from './std.js';
+export { ValidationError, validate } from './validation.js';
+export { calc, read_file, write_file, bash, json_query } from './std.js';

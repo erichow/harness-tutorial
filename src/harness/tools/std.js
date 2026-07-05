@@ -145,3 +145,47 @@ export const bash = new Tool({
   },
   sideEffects: ['read', 'network'],
 });
+
+// ── json_query ────────────────────────────────────────────
+
+export const json_query = new Tool({
+  name: 'json_query',
+  description: [
+    'Query JSON data with a simple dot-path expression.',
+    '',
+    'data: a JSON string (object or array).',
+    'path: a dot-separated path; e.g. "items.0.name" or "user.email".',
+    'Array indices are integers; object keys are dot-separated.',
+    '',
+    'Returns the queried value as JSON, or an error string if',
+    'the path does not exist.',
+    '',
+    'Side effects: none.',
+  ].join('\n'),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      data: { type: 'string' },
+      path: { type: 'string' },
+    },
+    required: ['data', 'path'],
+  },
+  run: ({ data, path: jsonPath }) => {
+    const obj = JSON.parse(data);
+    let current = obj;
+    for (const part of jsonPath.split('.')) {
+      if (Array.isArray(current)) {
+        current = current[parseInt(part, 10)];
+      } else if (typeof current === 'object' && current !== null) {
+        if (!(part in current)) {
+          throw new Error(`path not found: ${part}`);
+        }
+        current = current[part];
+      } else {
+        throw new Error(`cannot index ${typeof current} with ${part}`);
+      }
+    }
+    return JSON.stringify(current);
+  },
+  sideEffects: ['read'],
+});

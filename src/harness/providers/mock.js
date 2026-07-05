@@ -15,7 +15,9 @@ export class MockProvider {
    */
   constructor(responses) {
     this.name = 'mock';
-    this._responses = [...responses];
+    this._responses = responses.map(r =>
+      r instanceof ProviderResponse ? r : new ProviderResponse(r),
+    );
     this._index = 0;
   }
 
