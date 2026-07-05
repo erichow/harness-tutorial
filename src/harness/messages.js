@@ -124,8 +124,11 @@ export class Message {
     if (response.reasoning_text) {
       blocks.push(ReasoningBlock(response.reasoning_text, response.reasoning_metadata));
     }
+    // 第 5 章升级：迭代所有 tool_calls（不再是单数 tool_name）
     if (response.is_tool_call) {
-      blocks.push(ToolCall(response.tool_call_id, response.tool_name, response.tool_args));
+      for (const ref of response.tool_calls) {
+        blocks.push(ToolCall(ref.id, ref.name, ref.args));
+      }
     }
     if (response.is_final && response.text) {
       blocks.push(TextBlock(response.text));
