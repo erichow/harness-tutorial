@@ -1,0 +1,32 @@
+{
+  "name": "harness",
+  "version": "0.1.0",
+  "description": "AI Agent Harness — 把 Model 变成 Agent 的一整套工程",
+  "type": "module",
+  "main": "src/harness/index.js",
+  "exports": {
+    ".": "./src/harness/index.js",
+    "./agent": "./src/harness/agent.js",
+    "./messages": "./src/harness/messages.js",
+    "./providers": "./src/harness/providers/index.js",
+    "./tools": "./src/harness/tools/index.js",
+    "./context": "./src/harness/context/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": ">=0.40",
+    "openai": ">=4.70"
+  },
+  "devDependencies": {
+    "vitest": ">=2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
