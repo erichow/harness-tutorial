@@ -9,6 +9,7 @@
  */
 
 import { run } from '../src/harness/agent.js';
+import { ProviderResponse } from '../src/harness/providers/base.js';
 import { MockProvider } from '../src/harness/providers/mock.js';
 
 // ---- 工具 ----
@@ -21,13 +22,12 @@ function calc(expression) {
 // ---- Mock provider ----
 
 const mock = new MockProvider([
-  {
-    kind: 'tool_call',
+  new ProviderResponse({
     tool_name: 'calc',
     tool_args: { expression: '2 + 2' },
     tool_call_id: 'call-1',
-  },
-  { kind: 'text', text: '2 + 2 is 4.' },
+  }),
+  new ProviderResponse({ text: '2 + 2 is 4.' }),
 ]);
 
 // ---- Tool schemas ----

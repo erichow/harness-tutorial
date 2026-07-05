@@ -1,27 +1,26 @@
 /**
- * Mock Provider — 第 2 章
+ * Mock Provider — 第 3 章升级
  *
- * 脚本化的 fake，走查固定的 ProviderResponse 列表，
- * 每调一次 complete 前进一格。
- * 离线、确定性、零成本。
+ * 适配新的 ProviderResponse（无 kind 字段，用 is_final/is_tool_call）。
+ * 支持 reasoning 模拟。
  */
 
-/**
- * @implements {import('./base.js').Provider}
- */
+import { ProviderResponse } from './base.js';
+
 export class MockProvider {
   /**
    * @param {import('./base.js').ProviderResponse[]} responses
    */
   constructor(responses) {
+    this.name = 'mock';
     this._responses = [...responses];
     this._index = 0;
   }
 
   /**
-   * @param {object[]} _transcript
+   * @param {import('../messages.js').Transcript} _transcript
    * @param {object[]} _tools
-   * @returns {import('./base.js').ProviderResponse}
+   * @returns {ProviderResponse}
    */
   complete(_transcript, _tools) {
     if (this._index >= this._responses.length) {

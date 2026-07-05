@@ -1,11 +1,14 @@
 /**
- * 第 2 章测试 — Agent 最小循环
+ * 第 2 章测试 — Agent 最小循环（第 3 章升级适配版）
  *
- * 覆盖 happy path + 5 个 break
+ * 仍需独立跑以验证 Ch 2 的概念活着。
+ * 但 mock 响应从裸 dict 升级为 ProviderResponse，
+ * Break 1 & 3 的行为从 crash 变成优雅恢复（第 3 章的 try/except）。
  */
 
 import { describe, it, expect } from 'vitest';
 import { run } from '../src/harness/agent.js';
+import { ProviderResponse } from '../src/harness/providers/base.js';
 import { MockProvider } from '../src/harness/providers/mock.js';
 
 // ---- Happy path: calculator ----
@@ -13,13 +16,12 @@ import { MockProvider } from '../src/harness/providers/mock.js';
 describe('Chapter 2 — happy path', () => {
   it('calculator 两个回合', () => {
     const mock = new MockProvider([
-      {
-        kind: 'tool_call',
+      new ProviderResponse({
         tool_name: 'calc',
         tool_args: { expression: '2 + 2' },
         tool_call_id: 'call-1',
-      },
-      { kind: 'text', text: '2 + 2 is 4.' },
+      }),
+      new ProviderResponse({ text: '2 + 2 is 4.' }),
     ]);
 
     const toolSchemas = [{
@@ -36,7 +38,7 @@ describe('Chapter 2 — happy path', () => {
 
   it('纯文本响应（无工具调用）', () => {
     const mock = new MockProvider([
-      { kind: 'text', text: 'Hello, world!' },
+      new ProviderResponse({ text: 'Hello, world!' }),
     ]);
 
     const result = run(mock, {}, [], 'Hi');
@@ -44,15 +46,17 @@ describe('Chapter 2 — happy path', () => {
   });
 });
 
-// ---- Break 1: unknown tool ----
+// ---- Break 1: unknown tool — 第 3 章修复：不再崩溃，返回 is_error ----
 
 describe('Break 1 — unknown tool', () => {
-  it('模型叫了不存在的工具 → throw', () => {
+  it('模型叫了不存在的工具 → 返回 is_error 让模型恢复（不崩）', () => {
     const mock = new MockProvider([
-      { kind: 'tool_call', tool_name: 'calculator', tool_args: { expr: '2+2' }, tool_call_id: 'call-1' },
+      new ProviderResponse({ tool_name: 'nosuchtool', tool_args: {}, tool_call_id: 'call-1' }),
+      new ProviderResponse({ text: 'I give up.' }),
     ]);
 
-    expect(() => run(mock, {}, [], 'What is 2+2?')).toThrow(/unknown tool/);
+    const result = run(mock, {}, [], 'Do something');
+    expect(result).toBe('I give up.');
   });
 });
 
@@ -61,13 +65,12 @@ describe('Break 1 — unknown tool', () => {
 describe('Break 2 — schema mismatch', () => {
   it('参数 key 错了（expr vs expression）→ 静默传错参', () => {
     const mock = new MockProvider([
-      {
-        kind: 'tool_call',
+      new ProviderResponse({
         tool_name: 'calc',
-        tool_args: { expr: '2+2' },           // ← 应该是 expression
+        tool_args: { expr: '2+2' },            // ← 应该是 expression
         tool_call_id: 'call-1',
-      },
-      { kind: 'text', text: 'done' },
+      }),
+      new ProviderResponse({ text: 'done' }),
     ]);
 
     function calc(expression) {
@@ -75,29 +78,24 @@ describe('Break 2 — schema mismatch', () => {
       return expression;                       // → 'undefined'
     }
 
-    // 不抛异常——因为 tool_fn 被调了，但参数是错的
-    // 这是朴素 loop 的 bug：不校验参数名
     const result = run(mock, { calc }, [], 'What is 2+2?');
     expect(result).toBe('done');
   });
 });
 
-// ---- Break 3: tool throws ----
+// ---- Break 3: tool throws — 第 3 章修复：不再崩溃，返回 is_error ----
 
 describe('Break 3 — tool throws', () => {
-  it('工具抛异常 → 整个 loop 死', () => {
-    const mock = new MockProvider([
-      {
-        kind: 'tool_call',
-        tool_name: 'crash',
-        tool_args: {},
-        tool_call_id: 'call-1',
-      },
-    ]);
-
+  it('工具抛异常 → 捕获并返回 is_error，模型可恢复（不崩）', () => {
     function crash() { throw new Error('BOOM'); }
 
-    expect(() => run(mock, { crash }, [], 'crash')).toThrow('BOOM');
+    const mock = new MockProvider([
+      new ProviderResponse({ tool_name: 'crash', tool_args: {}, tool_call_id: 'call-1' }),
+      new ProviderResponse({ text: 'I handled the error.' }),
+    ]);
+
+    const result = run(mock, { crash }, [], 'crash');
+    expect(result).toBe('I handled the error.');
   });
 });
 
@@ -105,16 +103,11 @@ describe('Break 3 — tool throws', () => {
 
 describe('Break 4 — 永远停不下来', () => {
   it('超过 MAX_ITERATIONS → throw，transcript 丢掉', () => {
-    // 造 25 个 tool_call（超过 MAX_ITERATIONS=20）
-    const calls = Array.from({ length: 25 }, (_, i) => ({
-      kind: 'tool_call',
-      tool_name: 'echo',
-      tool_args: { msg: String(i) },
-      tool_call_id: `call-${i}`,
-    }));
+    const calls = Array.from({ length: 25 }, (_, i) =>
+      new ProviderResponse({ tool_name: 'echo', tool_args: { msg: String(i) }, tool_call_id: `call-${i}` })
+    );
 
     const mock = new MockProvider(calls);
-
     function echo(msg) { return msg; }
 
     expect(() => run(mock, { echo }, [], 'loop forever')).toThrow(/did not finish/);
@@ -128,20 +121,16 @@ describe('Break 5 — 工具返回大量内容', () => {
     const bigText = 'X'.repeat(20_000);
 
     const mock = new MockProvider([
-      {
-        kind: 'tool_call',
+      new ProviderResponse({
         tool_name: 'read_file',
         tool_args: { path: 'big.json' },
         tool_call_id: 'call-1',
-      },
-      { kind: 'text', text: 'done' },
+      }),
+      new ProviderResponse({ text: 'done' }),
     ]);
 
     function read_file(_path) { return bigText; }
 
-    // 不抛异常——但 transcript 里塞进了 20KB
-    // 下一回合会把所有 transcript 发回 provider，超出窗口
-    // loop 对此毫无觉察
     const result = run(mock, { read_file }, [], 'Read the file');
     expect(result).toBe('done');
   });
