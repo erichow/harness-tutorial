@@ -1,7 +1,7 @@
 /**
  * 第 2 章示例 — Calculator
  *
- * 两个回合的 agent：
+ * 两个回合的 agent（第 4 章适配版）：
  *   round 1: 模型请求调用 calc("2 + 2")
  *   round 2: 模型读到结果，给出 final answer "2 + 2 is 4."
  *
@@ -11,13 +11,20 @@
 import { run } from '../src/harness/agent.js';
 import { ProviderResponse } from '../src/harness/providers/base.js';
 import { MockProvider } from '../src/harness/providers/mock.js';
+import { Tool, ToolRegistry } from '../src/harness/tools/index.js';
 
 // ---- 工具 ----
 
-function calc(expression) {
-  // 生产中危险，mock 里无害
-  return String(eval(expression));
-}
+const calcTool = new Tool({
+  name: 'calc',
+  description: 'Evaluate a Python arithmetic expression.',
+  inputSchema: {
+    type: 'object',
+    properties: { expression: { type: 'string' } },
+    required: ['expression'],
+  },
+  run: ({ expression }) => String(eval(expression)),
+});
 
 // ---- Mock provider ----
 
@@ -30,19 +37,11 @@ const mock = new MockProvider([
   new ProviderResponse({ text: '2 + 2 is 4.' }),
 ]);
 
-// ---- Tool schemas ----
+// ---- Registry ----
 
-const toolSchemas = [{
-  name: 'calc',
-  description: 'Evaluate a Python arithmetic expression.',
-  input_schema: {
-    type: 'object',
-    properties: { expression: { type: 'string' } },
-    required: ['expression'],
-  },
-}];
+const registry = new ToolRegistry([calcTool]);
 
 // ---- Run ----
 
-const answer = run(mock, { calc }, toolSchemas, 'What is 2 + 2?');
+const answer = run(mock, registry, 'What is 2 + 2?');
 console.log(answer);  // → "2 + 2 is 4."
